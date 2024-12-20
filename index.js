@@ -26,10 +26,16 @@ async function run() {
     await client.connect();
 
     const menuCollection = client.db("restaurant").collection("menu");
+    const reviewCollecton = client.db("restaurant").collection("reviews");
 
     app.get("/menu", async (req, res) => {
       const menus = await menuCollection.find().toArray();
       res.send(menus);
+    });
+
+    app.get("/review", async (req, res) => {
+      const reviews = await reviewCollecton.find().toArray();
+      res.send(reviews);
     });
 
     // Send a ping to confirm a successful connection
