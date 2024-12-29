@@ -47,20 +47,35 @@ async function run() {
 
     const verifyToken = (req, res, next) => {
       if (!req.headers?.authorization) {
-        return res.status(401).send({ message: "forbidden access" });
+        return res.status(401).send({ message: "Unauthorized" });
       }
       const token = req.headers.authorization.split(" ")[1];
       // invalid token
       jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
         // err
         if (err) {
-          return res.status(401).send({ message: "Forbidden Access" });
+          return res.status(401).send({ message: "Unauthorized" });
         }
 
         // decoded
-        req.decoded = decoded;
+        req.decoded = decoded.data.email;
         next();
       });
+    };
+
+    // Verify Admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded;
+      const quary = { email: email };
+      const result = await userCollecton.findOne(quary);
+      const isAdmin = result?.role === "admin";
+      console.log(isAdmin);
+      if (!isAdmin) {
+        return res.status(403).send({
+          message: "Forbidden Acess",
+        });
+      }
+      next();
     };
 
     app.post("/user", async (req, res) => {
@@ -77,13 +92,33 @@ async function run() {
       const result = await userCollecton.insertOne(user);
       res.send(result);
     });
+
+    // get admin User
+    app.get("/user/admin/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const decodedEmail = req.decoded;
+      console.log("Decodd Enail is: ", decodedEmail);
+      if (!decodedEmail === email) {
+        return res.status(403).send({
+          message: "Fobidden Access",
+        });
+      }
+      const quary = { email: email };
+      const result = await userCollecton.findOne(quary);
+      let isAdmin = false;
+      if (result?.role === "admin") {
+        isAdmin = true;
+      }
+
+      res.send(isAdmin);
+    });
     // Get all Users
-    app.get("/user", verifyToken, async (req, res) => {
+    app.get("/user", verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollecton.find().toArray();
       res.send(result);
     });
     //Update Users
-    app.patch("/user/:id", async (req, res) => {
+    app.patch("/user/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       // const options = { upsert: true };
@@ -93,13 +128,12 @@ async function run() {
         },
       };
 
-      console.log(id, filter);
       const result = await userCollecton.updateOne(filter, updateDoc);
-      console.log(result);
+
       res.send(result);
     });
     // Delete a Users
-    app.delete("/user/:id", async (req, res) => {
+    app.delete("/user/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params;
       const quary = { _id: new ObjectId(id) };
       const result = await userCollecton.deleteOne(quary);
