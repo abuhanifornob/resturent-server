@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 
@@ -8,7 +9,7 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.qcwubtw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -27,6 +28,83 @@ async function run() {
 
     const menuCollection = client.db("restaurant").collection("menu");
     const reviewCollecton = client.db("restaurant").collection("reviews");
+    const orderCartsCollecton = client.db("restaurant").collection("carts");
+    const userCollecton = client.db("restaurant").collection("user");
+
+    // JWT Information
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(
+        {
+          data: user,
+        },
+        process.env.ACCESS_TOKEN,
+        { expiresIn: "1h" }
+      );
+
+      res.send({ token });
+    });
+
+    const verifyToken = (req, res, next) => {
+      if (!req.headers?.authorization) {
+        return res.status(401).send({ message: "forbidden access" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      // invalid token
+      jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+        // err
+        if (err) {
+          return res.status(401).send({ message: "Forbidden Access" });
+        }
+
+        // decoded
+        req.decoded = decoded;
+        next();
+      });
+    };
+
+    app.post("/user", async (req, res) => {
+      const user = req.body;
+      const email = user?.email;
+      const quary = { email };
+      const isExist = await userCollecton.findOne(quary);
+      if (isExist) {
+        return res.send({
+          message: "Email Id already Exist",
+          insertedId: null,
+        });
+      }
+      const result = await userCollecton.insertOne(user);
+      res.send(result);
+    });
+    // Get all Users
+    app.get("/user", verifyToken, async (req, res) => {
+      const result = await userCollecton.find().toArray();
+      res.send(result);
+    });
+    //Update Users
+    app.patch("/user/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      // const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+
+      console.log(id, filter);
+      const result = await userCollecton.updateOne(filter, updateDoc);
+      console.log(result);
+      res.send(result);
+    });
+    // Delete a Users
+    app.delete("/user/:id", async (req, res) => {
+      const id = req.params;
+      const quary = { _id: new ObjectId(id) };
+      const result = await userCollecton.deleteOne(quary);
+      res.send(result);
+    });
 
     app.get("/menu", async (req, res) => {
       const menus = await menuCollection.find().toArray();
@@ -36,6 +114,24 @@ async function run() {
     app.get("/review", async (req, res) => {
       const reviews = await reviewCollecton.find().toArray();
       res.send(reviews);
+    });
+    app.get("/cart", async (req, res) => {
+      const email = req.query.email;
+      const quary = { email: email };
+      const result = await orderCartsCollecton.find(quary).toArray();
+      res.send(result);
+    });
+    app.delete("/cart/:id", async (req, res) => {
+      const id = req.params.id;
+      const queary = { _id: new ObjectId(id) };
+      const result = await orderCartsCollecton.deleteOne(queary);
+      res.send(result);
+    });
+
+    app.post("/cart", async (req, res) => {
+      const cartItem = req.body;
+      const result = await orderCartsCollecton.insertOne(cartItem);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
