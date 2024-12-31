@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 
@@ -134,8 +135,8 @@ async function run() {
     });
     // Delete a Users
     app.delete("/user/:id", verifyToken, verifyAdmin, async (req, res) => {
-      const id = req.params;
-      const quary = { _id: new ObjectId(id) };
+      const deleted = req.params.id;
+      const quary = { _id: new ObjectId(deleted) };
       const result = await userCollecton.deleteOne(quary);
       res.send(result);
     });
@@ -148,6 +149,22 @@ async function run() {
     app.post("/menu", verifyToken, verifyAdmin, async (req, res) => {
       const bodyData = req.body;
       const result = await menuCollection.insertOne(bodyData);
+      res.send(result);
+    });
+    app.get("/menu/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await menuCollection.findOne(query);
+      console.log(result);
+      res.send(result);
+    });
+
+    app.delete("/menu/:id", verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const quary = { _id: new ObjectId(id) };
+
+      const result = await menuCollection.deleteOne(quary);
+      console.log("inside amenu delete Result", result);
       res.send(result);
     });
 
