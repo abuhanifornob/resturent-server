@@ -32,6 +32,7 @@ async function run() {
     const reviewCollecton = client.db("restaurant").collection("reviews");
     const orderCartsCollecton = client.db("restaurant").collection("carts");
     const userCollecton = client.db("restaurant").collection("user");
+    const paymentCollecton = client.db("restaurant").collection("payments");
 
     // JWT Information
     app.post("/jwt", async (req, res) => {
@@ -99,7 +100,6 @@ async function run() {
     app.get("/user/admin/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const decodedEmail = req.decoded;
-      console.log("Decodd Enail is: ", decodedEmail);
       if (!decodedEmail === email) {
         return res.status(403).send({
           message: "Fobidden Access",
@@ -206,19 +206,37 @@ async function run() {
       const result = await orderCartsCollecton.insertOne(cartItem);
       res.send(result);
     });
-    app.post("/create-payment-intent", async (req, res) => {
-      console.log(req.body);
-      const { price } = req.body;
 
-      console.log("payment Price", price);
+    // Payemnt Status......................
+
+    app.get("/payments/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+      const quary = { email: email };
+      const result = await paymentCollecton.find(quary).toArray();
+      res.send(result);
+    });
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollecton.insertOne(payment);
+      const quary = {
+        _id: {
+          $in: payment.cardIds.map((id) => new ObjectId(id)),
+        },
+      };
+      await orderCartsCollecton.deleteMany(quary);
+
+      res.send(paymentResult);
+    });
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
       const amount = parseInt(price * 100);
-      console.log("payment Price to conver amount", amount);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: "usd",
         payment_method_types: ["card"],
       });
-      console.log(paymentIntent);
+
       res.send({
         clientSecret: paymentIntent.client_secret,
       });
