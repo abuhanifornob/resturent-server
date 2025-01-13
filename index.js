@@ -228,6 +228,34 @@ async function run() {
 
       res.send(paymentResult);
     });
+    app.get("/admin-status", async (req, res) => {
+      const users = await userCollecton.estimatedDocumentCount();
+      const menuItems = await menuCollection.estimatedDocumentCount();
+      const oredrs = await paymentCollecton.estimatedDocumentCount();
+
+      const revenueResult = await paymentCollecton
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalReveune: { $sum: { $toDouble: "$price" } },
+            },
+          },
+        ])
+        .toArray();
+      let totalRevenuea = 0;
+      if (revenueResult.length > 0) {
+        totalRevenuea = revenueResult[0].totalReveune;
+      }
+
+      console.log("Reveune Result is ", revenueResult[0].totalReveune);
+      res.send({
+        users,
+        menuItems,
+        oredrs,
+        totalRevenuea,
+      });
+    });
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
